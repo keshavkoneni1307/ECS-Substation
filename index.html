@@ -1,955 +1,1061 @@
 <!DOCTYPE html>
 <html lang="en" class="dark">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Substation & Generator Fluctuation Dashboard</title>
-    <!-- Tailwind CSS CDN -->
-    <script src="https://cdn.tailwindcss.com"></script>
-    <!-- FontAwesome CDN -->
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    <!-- Chart.js CDN -->
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-    <!-- Inter Font -->
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
-    <script>
-        tailwind.config = {
-            darkMode: 'class',
-            theme: {
-                extend: {
-                    colors: {
-                        brand: {
-                            50: '#f0f9ff',
-                            500: '#06b6d4',
-                            600: '#0891b2',
-                            900: '#0f172a',
-                        }
-                    },
-                    fontFamily: {
-                        sans: ['Inter', 'sans-serif'],
-                    }
-                }
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Hardware Fluctuation Dashboard</title>
+  <!-- Tailwind CSS -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Chart.js -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <!-- Font Awesome -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          colors: {
+            brand: {
+              50: '#f0fdf4',
+              500: '#10b981',
+              600: '#059669',
+              900: '#064e3b',
             }
+          }
         }
-    </script>
-    <style>
-        body {
-            font-family: 'Inter', sans-serif;
-            background-color: #0b0f19;
-            color: #f3f4f6;
-        }
-        ::-webkit-scrollbar {
-            width: 6px;
-            height: 6px;
-        }
-        ::-webkit-scrollbar-track {
-            background: #111827;
-        }
-        ::-webkit-scrollbar-thumb {
-            background: #374151;
-            border-radius: 4px;
-        }
-        ::-webkit-scrollbar-thumb:hover {
-            background: #4b5563;
-        }
-        .glow-card {
-            background: rgba(17, 24, 39, 0.7);
-            backdrop-filter: blur(12px);
-            border: 1px solid rgba(255, 255, 255, 0.08);
-            box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
-        }
-        .glow-card:hover {
-            border-color: rgba(6, 182, 212, 0.3);
-        }
-        .generator-card {
-            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-        }
-        .pulse-indicator {
-            box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.7);
-            animation: pulse-green 2s infinite;
-        }
-        @keyframes pulse-green {
-            0% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.7); }
-            70% { transform: scale(1); box-shadow: 0 0 0 8px rgba(16, 185, 129, 0); }
-            100% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(16, 185, 129, 0); }
-        }
-        .modal-backdrop {
-            background: rgba(3, 7, 18, 0.85);
-            backdrop-filter: blur(8px);
-        }
-    </style>
+      }
+    }
+  </script>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap');
+    body {
+      font-family: 'Inter', sans-serif;
+      background-color: #0b0f19;
+      color: #f3f4f6;
+    }
+    .font-mono-code {
+      font-family: 'JetBrains Mono', monospace;
+    }
+    /* Custom Scrollbar */
+    ::-webkit-scrollbar {
+      width: 6px;
+      height: 6px;
+    }
+    ::-webkit-scrollbar-track {
+      background: #111827;
+    }
+    ::-webkit-scrollbar-thumb {
+      background: #374151;
+      border-radius: 3px;
+    }
+    ::-webkit-scrollbar-thumb:hover {
+      background: #4b5563;
+    }
+    .glow-alert-red {
+      box-shadow: 0 0 20px rgba(239, 68, 68, 0.35);
+    }
+    .glow-alert-amber {
+      box-shadow: 0 0 20px rgba(245, 158, 11, 0.35);
+    }
+    .glow-green {
+      box-shadow: 0 0 15px rgba(16, 185, 129, 0.2);
+    }
+  </style>
 </head>
-<body class="min-h-screen flex flex-col antialiased">
+<body class="min-h-screen flex flex-col bg-slate-950 text-slate-100 antialiased selection:bg-emerald-500 selection:text-white">
 
-    <!-- Navigation Header -->
-    <header class="border-b border-gray-800 bg-gray-900/80 backdrop-blur-md sticky top-0 z-40">
-        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3.5 flex flex-wrap items-center justify-between gap-4">
-            <div class="flex items-center space-x-3">
-                <div class="p-2.5 bg-cyan-500/10 border border-cyan-500/30 rounded-xl text-cyan-400">
-                    <i class="fa-solid fa-bolt-lightning text-xl"></i>
-                </div>
-                <div>
-                    <h1 class="text-xl font-bold text-white tracking-tight flex items-center gap-2">
-                        Substation & Generator Monitor
-                        <span class="text-xs font-semibold px-2.5 py-0.5 rounded-full bg-cyan-950 text-cyan-400 border border-cyan-800">
-                            <i class="fa-solid fa-clock text-[10px] mr-1"></i>3s Timeline
-                        </span>
-                    </h1>
-                    <p class="text-xs text-gray-400">Real-time load fluctuation, voltage variance & unit telemetry</p>
-                </div>
-            </div>
-
-            <div class="flex items-center gap-3">
-                <!-- Fluctuation Preset Select -->
-                <div class="flex items-center bg-gray-800/80 border border-gray-700 rounded-lg px-3 py-1.5 text-xs text-gray-300">
-                    <i class="fa-solid fa-sliders text-cyan-400 mr-2"></i>
-                    <span class="mr-2 text-gray-400">Fluctuation Jitter:</span>
-                    <select id="fluctuationPreset" class="bg-transparent font-medium text-white focus:outline-none cursor-pointer">
-                        <option value="low" class="bg-gray-900 text-gray-200">Low Noise (±2%)</option>
-                        <option value="medium" selected class="bg-gray-900 text-gray-200">Standard Fluctuation (±5%)</option>
-                        <option value="high" class="bg-gray-900 text-gray-200">High Fluctuation (±12%)</option>
-                        <option value="extreme" class="bg-gray-900 text-gray-200">Critical Grid Jitter (±20%)</option>
-                    </select>
-                </div>
-
-                <!-- Custom Timeline Selector -->
-                <div class="flex items-center bg-gray-800/80 border border-gray-700 rounded-lg px-3 py-1.5 text-xs text-gray-300">
-                    <i class="fa-solid fa-clock text-cyan-400 mr-2"></i>
-                    <span class="mr-2 text-gray-400">Timeline:</span>
-                    <select id="timelineIntervalSelect" class="bg-transparent font-medium text-white focus:outline-none cursor-pointer">
-                        <option value="500" class="bg-gray-900 text-gray-200">0.5s</option>
-                        <option value="1000" class="bg-gray-900 text-gray-200">1.0s</option>
-                        <option value="3000" selected class="bg-gray-900 text-gray-200">3.0s (Default)</option>
-                        <option value="5000" class="bg-gray-900 text-gray-200">5.0s</option>
-                        <option value="10000" class="bg-gray-900 text-gray-200">10.0s</option>
-                    </select>
-                </div>
-
-                <!-- Custom Voltage Setting -->
-                <div class="flex items-center bg-gray-800/80 border border-gray-700 rounded-lg px-3 py-1.5 text-xs text-gray-300">
-                    <i class="fa-solid fa-bolt text-amber-400 mr-2"></i>
-                    <span class="mr-2 text-gray-400">Voltage:</span>
-                    <input type="number" id="voltageInput" value="240" min="50" max="1000" step="5" class="w-16 bg-gray-900 border border-gray-700 rounded px-1.5 py-0.5 text-white font-mono text-xs focus:outline-none focus:border-cyan-500">
-                    <span class="ml-1 text-gray-400">V</span>
-                </div>
-
-                <!-- Add Generator/Substation Button -->
-                <button id="openAddModalBtn" class="flex items-center gap-2 bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 text-white font-semibold text-sm px-4 py-2 rounded-lg shadow-lg shadow-cyan-500/20 transition-all duration-200 active:scale-95">
-                    <i class="fa-solid fa-circle-plus"></i>
-                    <span>Add Unit</span>
-                </button>
-            </div>
+  <header class="border-b border-slate-800 bg-slate-900/90 backdrop-blur-md sticky top-0 z-40">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3 flex flex-wrap items-center justify-between gap-4">
+      
+      <!-- Brand & Status -->
+      <div class="flex items-center space-x-3">
+        <div class="w-10 h-10 rounded-xl bg-emerald-500/10 border border-emerald-500/30 flex items-center justify-center text-emerald-400">
+          <i class="fa-solid fa-bolt-lightning text-xl"></i>
         </div>
-    </header>
-
-    <main class="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-6">
-
-        <!-- Top Summary Cards Grid -->
-        <section class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-            <!-- Total Active Capacity -->
-            <div class="glow-card rounded-xl p-4 flex flex-col justify-between">
-                <div class="flex items-center justify-between text-gray-400 text-xs font-medium">
-                    <span>TOTAL GRID CAPACITY</span>
-                    <i class="fa-solid fa-tower-observation text-cyan-400"></i>
-                </div>
-                <div class="my-2">
-                    <span id="totalCapacityVal" class="text-2xl sm:text-3xl font-extrabold text-white">0</span>
-                    <span class="text-sm font-semibold text-gray-400">kW</span>
-                </div>
-                <div class="flex items-center justify-between text-xs text-gray-400 border-t border-gray-800/80 pt-2">
-                    <span>Active Units: <strong id="activeGeneratorsCount" class="text-cyan-400">0</strong></span>
-                    <span id="capacityTrend" class="text-emerald-400"><i class="fa-solid fa-circle-check"></i> Connected</span>
-                </div>
-            </div>
-
-            <!-- Real-time Power Output -->
-            <div class="glow-card rounded-xl p-4 flex flex-col justify-between">
-                <div class="flex items-center justify-between text-gray-400 text-xs font-medium">
-                    <span>CURRENT POWER OUTPUT</span>
-                    <i class="fa-solid fa-plug-circle-bolt text-emerald-400"></i>
-                </div>
-                <div class="my-2">
-                    <span id="realtimePowerVal" class="text-2xl sm:text-3xl font-extrabold text-emerald-400">0</span>
-                    <span class="text-sm font-semibold text-gray-400">kW</span>
-                </div>
-                <div class="w-full bg-gray-800 rounded-full h-1.5 overflow-hidden">
-                    <div id="capacityBar" class="bg-emerald-500 h-1.5 rounded-full transition-all duration-300" style="width: 0%"></div>
-                </div>
-            </div>
-
-            <!-- Voltage & Current Fluctuation -->
-            <div class="glow-card rounded-xl p-4 flex flex-col justify-between">
-                <div class="flex items-center justify-between text-gray-400 text-xs font-medium">
-                    <span>LINE VOLTAGE & CURRENT</span>
-                    <i class="fa-solid fa-wave-square text-amber-400"></i>
-                </div>
-                <div class="my-2 flex items-baseline gap-3">
-                    <div>
-                        <span id="liveVoltageVal" class="text-2xl sm:text-3xl font-extrabold text-white">240.0</span>
-                        <span class="text-xs text-gray-400">V</span>
-                    </div>
-                    <div class="text-sm font-semibold text-amber-400">
-                        <span id="liveCurrentVal">18.5</span> A
-                    </div>
-                </div>
-                <div class="flex items-center text-xs text-gray-400 border-t border-gray-800/80 pt-2 justify-between">
-                    <span>Current Fluctuation Jitter:</span>
-                    <span id="jitterPct" class="font-bold text-amber-400">±1.2%</span>
-                </div>
-            </div>
-
-            <!-- Grid Health Status -->
-            <div class="glow-card rounded-xl p-4 flex flex-col justify-between">
-                <div class="flex items-center justify-between text-gray-400 text-xs font-medium">
-                    <span>GRID SYSTEM STATUS</span>
-                    <span class="w-2.5 h-2.5 rounded-full bg-emerald-500 pulse-indicator"></span>
-                </div>
-                <div class="my-2 flex items-center gap-2">
-                    <span id="systemStatusBadge" class="text-lg font-bold text-emerald-400">NORMAL</span>
-                </div>
-                <div class="flex items-center text-xs text-gray-400 border-t border-gray-800/80 pt-2 justify-between">
-                    <span>Timeline Sync:</span>
-                    <span id="loadStressVal" class="font-medium text-cyan-400">3s interval</span>
-                </div>
-            </div>
-        </section>
-
-        <!-- Live Charts Section -->
-        <section class="grid grid-cols-1 lg:grid-cols-3 gap-6">
-            <!-- Main Fluctuation Live Line Chart -->
-            <div class="lg:col-span-2 glow-card rounded-xl p-5 flex flex-col">
-                <div class="flex items-center justify-between mb-4">
-                    <div>
-                        <h2 class="text-base font-bold text-white flex items-center gap-2">
-                            <i class="fa-solid fa-chart-line text-cyan-400"></i>
-                            Real-Time Power & Load Fluctuation Waveform
-                        </h2>
-                        <p class="text-xs text-gray-400">Original 3-second interval telemetry streaming</p>
-                    </div>
-                    <div class="flex items-center gap-2 text-xs">
-                        <span class="inline-flex items-center gap-1.5 text-gray-300">
-                            <span class="w-3 h-3 rounded-full bg-cyan-400 inline-block"></span> Actual Output (kW)
-                        </span>
-                        <span class="inline-flex items-center gap-1.5 text-gray-400 ml-2">
-                            <span class="w-3 h-3 rounded-full bg-gray-600 inline-block"></span> Rated Capacity (kW)
-                        </span>
-                    </div>
-                </div>
-                <div class="relative flex-1 min-h-[260px] w-full">
-                    <canvas id="fluctuationChart"></canvas>
-                </div>
-            </div>
-
-            <!-- Current & Voltage Jitter Stream -->
-            <div class="glow-card rounded-xl p-5 flex flex-col">
-                <div class="flex items-center justify-between mb-4">
-                    <div>
-                        <h2 class="text-base font-bold text-white flex items-center gap-2">
-                            <i class="fa-solid fa-microchip text-indigo-400"></i>
-                            Voltage Telemetry Stream
-                        </h2>
-                        <p class="text-xs text-gray-400">Fixed 240V hardware baseline</p>
-                    </div>
-                </div>
-                <div class="relative flex-1 min-h-[260px] w-full">
-                    <canvas id="voltageChart"></canvas>
-                </div>
-            </div>
-        </section>
-
-        <!-- Equipment Units (Substations & Generators) -->
-        <section class="space-y-4">
-            <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-gray-800 pb-3">
-                <div class="flex items-center gap-3">
-                    <h2 class="text-lg font-bold text-white flex items-center gap-2">
-                        <i class="fa-solid fa-plug text-cyan-400"></i>
-                        Substations & Generators
-                    </h2>
-                    <span id="generatorBadgeCount" class="px-2.5 py-0.5 text-xs font-bold rounded-full bg-gray-800 text-gray-300 border border-gray-700">0 Active</span>
-                </div>
-
-                <div>
-                    <button id="openAddModalBtn2" class="text-xs font-semibold px-3.5 py-2 rounded-lg bg-cyan-600/30 hover:bg-cyan-600/50 text-cyan-300 border border-cyan-500/50 transition">
-                        <i class="fa-solid fa-plus mr-1"></i> Add Substation / Generator
-                    </button>
-                </div>
-            </div>
-
-            <!-- Dynamic Equipment Cards Container -->
-            <div id="generatorsGrid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
-                <!-- Dynamically populated via JavaScript -->
-            </div>
-
-            <!-- Empty State Notice -->
-            <div id="emptyGeneratorsState" class="hidden glow-card rounded-xl p-12 text-center border-dashed border-2 border-gray-800">
-                <div class="w-16 h-16 rounded-full bg-gray-800/80 flex items-center justify-center mx-auto mb-4 text-gray-500 text-2xl">
-                    <i class="fa-solid fa-plug-circle-xmark"></i>
-                </div>
-                <h3 class="text-lg font-semibold text-gray-200 mb-1">No Active Equipment Connected</h3>
-                <p class="text-sm text-gray-400 mb-6 max-w-md mx-auto">Click below to add a Substation or Generator unit to begin telemetry tracking.</p>
-                <button id="emptyAddBtn" class="inline-flex items-center gap-2 bg-cyan-600 hover:bg-cyan-500 text-white font-semibold text-sm px-5 py-2.5 rounded-lg transition shadow-lg shadow-cyan-500/20">
-                    <i class="fa-solid fa-plus"></i> Add Substation or Generator
-                </button>
-            </div>
-        </section>
-
-        <!-- Activity Log Console -->
-        <section class="glow-card rounded-xl p-4">
-            <div class="flex items-center justify-between mb-3">
-                <h3 class="text-sm font-bold text-gray-300 flex items-center gap-2">
-                    <i class="fa-solid fa-terminal text-cyan-400"></i>
-                    Hardware Telemetry Log
-                </h3>
-                <button id="clearLogsBtn" class="text-xs text-gray-400 hover:text-white transition">
-                    <i class="fa-solid fa-trash-can mr-1"></i> Clear Log
-                </button>
-            </div>
-            <div id="logConsole" class="bg-gray-950/80 rounded-lg p-3 font-mono text-xs text-gray-300 h-28 overflow-y-auto space-y-1 border border-gray-800/80">
-                <!-- Log entries inserted here -->
-            </div>
-        </section>
-
-    </main>
-
-    <!-- Add Unit Modal Dialog -->
-    <div id="addGeneratorModal" class="fixed inset-0 z-50 flex items-center justify-center p-4 modal-backdrop hidden transition-opacity duration-300 opacity-0">
-        <div class="glow-card bg-gray-900 rounded-2xl w-full max-w-md p-6 border border-gray-700 shadow-2xl transform transition-all scale-95 duration-200" id="modalContent">
-            
-            <div class="flex items-center justify-between border-b border-gray-800 pb-4 mb-4">
-                <div class="flex items-center gap-3">
-                    <div class="p-2 bg-cyan-500/10 text-cyan-400 rounded-lg">
-                        <i class="fa-solid fa-charging-station text-lg"></i>
-                    </div>
-                    <div>
-                        <h3 class="text-lg font-bold text-white">Add Equipment Unit</h3>
-                        <p class="text-xs text-gray-400">Configure parameters for Substation or Generator</p>
-                    </div>
-                </div>
-                <button id="closeModalBtn" class="text-gray-400 hover:text-white text-lg p-1">
-                    <i class="fa-solid fa-xmark"></i>
-                </button>
-            </div>
-
-            <form id="addGeneratorForm" class="space-y-4">
-                <!-- Unit Name -->
-                <div>
-                    <label class="block text-xs font-medium text-gray-300 mb-1">Unit Name / Identifier</label>
-                    <input type="text" id="genName" required placeholder="e.g. Substation Unit 3 or Generator B"
-                           class="w-full bg-gray-950 border border-gray-700 rounded-lg px-3 py-2 text-sm text-white placeholder-gray-500 focus:outline-none focus:border-cyan-500 transition">
-                </div>
-
-                <!-- Unit Category -->
-                <div>
-                    <label class="block text-xs font-medium text-gray-300 mb-1">Equipment Category</label>
-                    <select id="genType" class="w-full bg-gray-950 border border-gray-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-cyan-500 transition">
-                        <option value="Substation">Substation (Grid Node)</option>
-                        <option value="Generator">Generator (Power Generation)</option>
-                    </select>
-                </div>
-
-                <!-- Baseline Capacity -->
-                <div>
-                    <div class="flex justify-between items-center mb-1">
-                        <label class="text-xs font-medium text-gray-300">Target Max Capacity (kW)</label>
-                        <span id="genCapacityVal" class="text-xs font-bold text-cyan-400">300 kW</span>
-                    </div>
-                    <input type="range" id="genCapacity" min="50" max="1000" step="10" value="300"
-                           class="w-full accent-cyan-500 cursor-pointer">
-                </div>
-
-                <!-- Fluctuation Level -->
-                <div>
-                    <div class="flex justify-between items-center mb-1">
-                        <label class="text-xs font-medium text-gray-300">Fluctuation Variance Jitter (%)</label>
-                        <span id="genNoiseVal" class="text-xs font-bold text-amber-400">6%</span>
-                    </div>
-                    <input type="range" id="genNoise" min="1" max="25" step="1" value="6"
-                           class="w-full accent-amber-500 cursor-pointer">
-                </div>
-
-                <!-- Quick Presets -->
-                <div class="pt-2">
-                    <span class="text-xs text-gray-400 block mb-2">Quick Presets:</span>
-                    <div class="flex gap-2">
-                        <button type="button" onclick="applyPreset('Substation Beta', 'Substation', 500, 4)" class="text-xs bg-gray-800 hover:bg-gray-700 text-gray-300 py-1 px-2.5 rounded-md transition">500kW Substation</button>
-                        <button type="button" onclick="applyPreset('Generator Unit 3', 'Generator', 250, 8)" class="text-xs bg-gray-800 hover:bg-gray-700 text-gray-300 py-1 px-2.5 rounded-md transition">250kW Generator</button>
-                    </div>
-                </div>
-
-                <!-- Submit & Cancel Buttons -->
-                <div class="flex items-center justify-end gap-3 border-t border-gray-800 pt-4 mt-6">
-                    <button type="button" id="cancelModalBtn" class="px-4 py-2 rounded-lg text-xs font-semibold text-gray-400 hover:text-white hover:bg-gray-800 transition">Cancel</button>
-                    <button type="submit" class="px-5 py-2 rounded-lg text-xs font-semibold bg-cyan-500 hover:bg-cyan-400 text-gray-950 shadow-lg shadow-cyan-500/20 transition">Deploy Unit</button>
-                </div>
-            </form>
+        <div>
+          <h1 class="text-base font-bold tracking-tight text-white flex items-center gap-2">
+            Hardware Fluctuation Dashboard
+            <span class="text-[10px] px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 font-semibold uppercase">
+              RPi Edge Active
+            </span>
+          </h1>
+          <p class="text-xs text-slate-400">Grid Telemetry, Edge ML Anomaly Detection & Generator Control</p>
         </div>
+      </div>
+
+      <!-- Controls: Voltage, Timeline, ML Deploy, Sim Buttons -->
+      <div class="flex flex-wrap items-center gap-3">
+        <!-- Voltage Setting Input -->
+        <div class="flex items-center bg-slate-800/80 border border-slate-700 rounded-lg px-2.5 py-1 text-xs">
+          <span class="text-slate-400 font-medium mr-2 flex items-center gap-1">
+            <i class="fa-solid fa-plug text-amber-400"></i> Voltage:
+          </span>
+          <input type="number" id="setting-voltage" value="240" min="50" max="1000" step="1" onchange="onVoltageChange(this.value)" class="w-16 bg-slate-900 border border-slate-700 text-amber-400 font-mono-code font-bold rounded px-1.5 py-0.5 text-center focus:outline-none focus:border-amber-500">
+          <span class="text-slate-400 ml-1 font-semibold">V</span>
+        </div>
+
+        <!-- Telemetry Timeline Selector -->
+        <div class="flex items-center bg-slate-800/80 border border-slate-700 rounded-lg px-2.5 py-1 text-xs">
+          <span class="text-slate-400 font-medium mr-2 flex items-center gap-1">
+            <i class="fa-solid fa-clock text-blue-400"></i> Interval:
+          </span>
+          <select id="setting-timeline" onchange="onTimelineChange(this.value)" class="bg-slate-900 border border-slate-700 text-blue-400 font-mono-code font-bold rounded px-2 py-0.5 focus:outline-none focus:border-blue-500 cursor-pointer">
+            <option value="500">0.5s</option>
+            <option value="1000">1.0s</option>
+            <option value="3000" selected>3.0s (Original)</option>
+            <option value="5000">5.0s</option>
+            <option value="10000">10.0s</option>
+          </select>
+        </div>
+
+        <!-- ML / RPi Deploy Modal Trigger -->
+        <button onclick="openMlModal()" class="px-3 py-1.5 rounded-lg text-xs font-semibold bg-purple-600/20 hover:bg-purple-600/30 text-purple-300 border border-purple-500/40 transition flex items-center gap-1.5">
+          <i class="fa-brands fa-raspberry-pi text-rose-400"></i> RPi Data Extraction (.csv / .json)
+        </button>
+
+        <!-- Presentation Sim Controls -->
+        <div class="flex items-center space-x-1 border-l border-slate-800 pl-3">
+          <button onclick="triggerSimulatedOverload()" title="Simulate Critical Overload" class="px-2.5 py-1.5 rounded-lg text-xs font-semibold bg-rose-500/20 hover:bg-rose-500/30 text-rose-300 border border-rose-500/30 transition">
+            <i class="fa-solid fa-triangle-exclamation mr-1"></i> Sim Overload
+          </button>
+          <button onclick="triggerSimulatedDrop()" title="Simulate Sudden Load Drop" class="px-2.5 py-1.5 rounded-lg text-xs font-semibold bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 border border-amber-500/30 transition">
+            <i class="fa-solid fa-arrow-trend-down mr-1"></i> Sim Drop
+          </button>
+        </div>
+      </div>
+
     </div>
+  </header>
 
-    <!-- Confirmation Modal for Removing Unit -->
-    <div id="deleteConfirmModal" class="fixed inset-0 z-50 flex items-center justify-center p-4 modal-backdrop hidden transition-opacity duration-200 opacity-0">
-        <div class="glow-card bg-gray-900 rounded-2xl w-full max-w-sm p-6 border border-red-500/30 text-center shadow-2xl">
-            <div class="w-12 h-12 rounded-full bg-red-500/10 text-red-400 flex items-center justify-center mx-auto mb-3 text-xl">
-                <i class="fa-solid fa-triangle-exclamation"></i>
+  <main class="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-5 space-y-6">
+
+    <!-- Top Alert Notification Center -->
+    <section id="alert-notification-center" class="w-full rounded-2xl border border-emerald-500/30 bg-emerald-950/20 p-4 transition-all duration-300 glow-green">
+      <div class="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+        
+        <div class="flex items-start gap-3.5 flex-1">
+          <div id="alert-icon-wrapper" class="w-10 h-10 rounded-xl bg-emerald-500/20 border border-emerald-500/40 flex items-center justify-center text-emerald-400 shrink-0">
+            <i id="alert-icon" class="fa-solid fa-shield-halved text-lg"></i>
+          </div>
+          <div class="space-y-1">
+            <div class="flex items-center gap-2">
+              <span id="alert-title-badge" class="px-2.5 py-0.5 rounded-md text-xs font-bold bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 uppercase tracking-wide">
+                SYSTEM STABLE & NORMAL
+              </span>
+              <span id="alert-timestamp" class="text-[11px] text-slate-400 font-mono-code">Live Monitoring Active</span>
             </div>
-            <h3 class="text-lg font-bold text-white mb-1">Remove Equipment Unit?</h3>
-            <p id="deleteConfirmText" class="text-xs text-gray-400 mb-6">Are you sure you want to disconnect this unit from the dashboard?</p>
-            <div class="flex items-center justify-center gap-3">
-                <button id="cancelDeleteBtn" class="px-4 py-2 rounded-lg text-xs font-semibold text-gray-400 hover:text-white bg-gray-800 transition">Cancel</button>
-                <button id="confirmDeleteBtn" class="px-4 py-2 rounded-lg text-xs font-semibold bg-red-600 hover:bg-red-500 text-white shadow-lg shadow-red-600/20 transition">Yes, Remove</button>
-            </div>
+            <!-- Multi-Language Message Display -->
+            <p id="alert-message-text" class="text-sm text-slate-200 font-medium">
+              Grid status is nominal. Power distribution and load levels are well within safety boundaries.
+            </p>
+          </div>
         </div>
+
+        <!-- Language Step Selector Bar -->
+        <div class="flex items-center gap-1.5 flex-wrap self-end md:self-center bg-slate-900/80 p-1.5 rounded-xl border border-slate-800 shrink-0 text-xs">
+          <span class="text-[10px] uppercase font-bold text-slate-500 px-2">Language:</span>
+          <button onclick="setAlertLanguage('en')" id="lang-btn-en" class="px-2 py-1 rounded-md text-[11px] font-bold bg-emerald-500 text-slate-950 transition">EN</button>
+          <button onclick="setAlertLanguage('hi')" id="lang-btn-hi" class="px-2 py-1 rounded-md text-[11px] font-bold text-slate-400 hover:text-white transition">HI</button>
+          <button onclick="setAlertLanguage('te')" id="lang-btn-te" class="px-2 py-1 rounded-md text-[11px] font-bold text-slate-400 hover:text-white transition">TE</button>
+          <button onclick="setAlertLanguage('ta')" id="lang-btn-ta" class="px-2 py-1 rounded-md text-[11px] font-bold text-slate-400 hover:text-white transition">TA</button>
+          <button onclick="setAlertLanguage('kn')" id="lang-btn-kn" class="px-2 py-1 rounded-md text-[11px] font-bold text-slate-400 hover:text-white transition">KN</button>
+          <button onclick="setAlertLanguage('ml')" id="lang-btn-ml" class="px-2 py-1 rounded-md text-[11px] font-bold text-slate-400 hover:text-white transition">ML</button>
+          <button onclick="setAlertLanguage('mr')" id="lang-btn-mr" class="px-2 py-1 rounded-md text-[11px] font-bold text-slate-400 hover:text-white transition">MR</button>
+          <button onclick="setAlertLanguage('bn')" id="lang-btn-bn" class="px-2 py-1 rounded-md text-[11px] font-bold text-slate-400 hover:text-white transition">BN</button>
+          <button onclick="setAlertLanguage('gu')" id="lang-btn-gu" class="px-2 py-1 rounded-md text-[11px] font-bold text-slate-400 hover:text-white transition">GU</button>
+          <button onclick="setAlertLanguage('pa')" id="lang-btn-pa" class="px-2 py-1 rounded-md text-[11px] font-bold text-slate-400 hover:text-white transition">PA</button>
+          <button onclick="setAlertLanguage('or')" id="lang-btn-or" class="px-2 py-1 rounded-md text-[11px] font-bold text-slate-400 hover:text-white transition">OD</button>
+        </div>
+
+      </div>
+    </section>
+
+    <!-- Separated Analytics Graphs (Graph A & Graph B placed right under Header/Alerts) -->
+    <section class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      
+      <!-- Graph A: Line Voltage & Current -->
+      <div class="p-5 rounded-2xl border border-slate-800 bg-slate-900/80 backdrop-blur-md flex flex-col justify-between space-y-4">
+        <div class="flex items-center justify-between border-b border-slate-800/80 pb-3">
+          <div>
+            <h2 class="text-sm font-bold text-white flex items-center gap-2">
+              <i class="fa-solid fa-chart-line text-emerald-400"></i> Graph A: Line Voltage ($V$) & Current ($A$)
+            </h2>
+            <p class="text-xs text-slate-400">Real-time electrical waveform & current draw telemetry</p>
+          </div>
+          <div class="text-right font-mono-code">
+            <div class="text-xs text-slate-400">Live Current</div>
+            <div class="text-base font-bold text-emerald-400" id="metric-current">0.0 A</div>
+          </div>
+        </div>
+        <div class="w-full h-64">
+          <canvas id="chartVoltageCurrent"></canvas>
+        </div>
+        <div class="flex items-center justify-between text-xs text-slate-400 pt-2 border-t border-slate-800/60 font-mono-code">
+          <span>Fixed Grid Baseline: <strong class="text-amber-400" id="lbl-fixed-voltage">240.0V</strong></span>
+          <span>RMS Variation: <strong class="text-emerald-400" id="lbl-rms-current">±0.4A</strong></span>
+        </div>
+      </div>
+
+      <!-- Graph B: Power Demand & ML Anomaly Score -->
+      <div class="p-5 rounded-2xl border border-slate-800 bg-slate-900/80 backdrop-blur-md flex flex-col justify-between space-y-4">
+        <div class="flex items-center justify-between border-b border-slate-800/80 pb-3">
+          <div>
+            <h2 class="text-sm font-bold text-white flex items-center gap-2">
+              <i class="fa-solid fa-chart-area text-purple-400"></i> Graph B: Power Demand ($kW$) & ML Anomaly Index
+            </h2>
+            <p class="text-xs text-slate-400">Active load output vs. Edge AI fluctuation confidence</p>
+          </div>
+          <div class="text-right font-mono-code">
+            <div class="text-xs text-slate-400">Total Active Power</div>
+            <div class="text-base font-bold text-purple-400" id="metric-power">0.00 kW</div>
+          </div>
+        </div>
+        <div class="w-full h-64">
+          <canvas id="chartPowerAnomaly"></canvas>
+        </div>
+        <div class="flex items-center justify-between text-xs text-slate-400 pt-2 border-t border-slate-800/60 font-mono-code">
+          <span>Peak Grid Load: <strong class="text-purple-400" id="lbl-peak-power">0.00 kW</strong></span>
+          <span>Anomaly Score: <strong class="text-slate-300" id="lbl-anomaly-score">0.02 (Nominal)</strong></span>
+        </div>
+      </div>
+
+    </section>
+
+    <!-- Grid Equipment Management: Substations & Generators -->
+    <section class="space-y-5">
+      
+      <!-- Section Header & Add Node Actions -->
+      <div class="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+        <div>
+          <h2 class="text-base font-bold text-white flex items-center gap-2">
+            <i class="fa-solid fa-server text-blue-400"></i> Grid Nodes & Power Units
+          </h2>
+          <p class="text-xs text-slate-400">Manage Substations and Auxiliary Generators with direct unit switch controls</p>
+        </div>
+
+        <div class="flex items-center space-x-2">
+          <button onclick="openAddNodeModal('substation')" class="px-3 py-1.5 rounded-xl text-xs font-semibold bg-blue-600/20 hover:bg-blue-600/30 text-blue-300 border border-blue-500/40 transition flex items-center gap-1.5">
+            <i class="fa-solid fa-plus text-blue-400"></i> Add Substation
+          </button>
+          <button onclick="openAddNodeModal('generator')" class="px-3 py-1.5 rounded-xl text-xs font-semibold bg-amber-600/20 hover:bg-amber-600/30 text-amber-300 border border-amber-500/40 transition flex items-center gap-1.5">
+            <i class="fa-solid fa-plus text-amber-400"></i> Add Generator
+          </button>
+        </div>
+      </div>
+
+      <!-- Node Cards Container -->
+      <div id="nodes-container" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+        <!-- Rendered dynamically via JavaScript -->
+      </div>
+
+    </section>
+
+    <section class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+      
+      <!-- Live Event & Alert History Log -->
+      <div class="lg:col-span-2 p-5 rounded-2xl border border-slate-800 bg-slate-900/80 backdrop-blur-md">
+        <div class="flex items-center justify-between mb-3 border-b border-slate-800 pb-2">
+          <h3 class="text-sm font-bold text-white flex items-center gap-2">
+            <i class="fa-solid fa-list-ul text-slate-400"></i> Telemetry & Detection Audit Log
+          </h3>
+          <button onclick="clearEventLogs()" class="text-xs text-slate-400 hover:text-white transition">Clear Log</button>
+        </div>
+        <div id="log-container" class="space-y-2 max-h-48 overflow-y-auto font-mono-code text-xs pr-1">
+          <!-- Log entries injected here -->
+        </div>
+      </div>
+
+      <!-- Edge ML & RPi Configuration Status -->
+      <div class="p-5 rounded-2xl border border-slate-800 bg-slate-900/80 backdrop-blur-md flex flex-col justify-between">
+        <div>
+          <h3 class="text-sm font-bold text-white flex items-center gap-2 mb-2">
+            <i class="fa-solid fa-brain text-purple-400"></i> Edge AI Deployment Info
+          </h3>
+          <p class="text-xs text-slate-400 mb-4">RPi telemetry model weights & prediction thresholds</p>
+          
+          <div class="space-y-2.5 text-xs font-mono-code">
+            <div class="flex justify-between py-1 border-b border-slate-800">
+              <span class="text-slate-400">Model File:</span>
+              <span class="text-purple-300 font-bold" id="info-model-file">default_grid_model.json</span>
+            </div>
+            <div class="flex justify-between py-1 border-b border-slate-800">
+              <span class="text-slate-400">Overload Cap:</span>
+              <span class="text-rose-400 font-bold" id="info-overload-cap">85% Capacity</span>
+            </div>
+            <div class="flex justify-between py-1 border-b border-slate-800">
+              <span class="text-slate-400">Drop Threshold:</span>
+              <span class="text-amber-400 font-bold" id="info-drop-thresh">18% Collapse</span>
+            </div>
+            <div class="flex justify-between py-1 border-b border-slate-800">
+              <span class="text-slate-400">Audio Synthesis:</span>
+              <span class="text-slate-400 font-bold">100% Disabled (Silent)</span>
+            </div>
+          </div>
+        </div>
+
+        <button onclick="openMlModal()" class="w-full mt-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-purple-300 font-semibold text-xs border border-purple-500/30 transition flex items-center justify-center gap-2">
+          <i class="fa-solid fa-upload"></i> Upload CSV / JSON Model File
+        </button>
+      </div>
+
+    </section>
+
+  </main>
+
+  <!-- Deploy ML (.csv / .json) Modal -->
+  <div id="ml-modal" class="fixed inset-0 z-50 hidden bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-4">
+    <div class="bg-slate-900 border border-slate-800 rounded-2xl max-w-lg w-full p-6 space-y-5 shadow-2xl relative">
+      <button onclick="closeMlModal()" class="absolute top-4 right-4 text-slate-400 hover:text-white text-lg">
+        <i class="fa-solid fa-xmark"></i>
+      </button>
+
+      <div>
+        <h3 class="text-lg font-bold text-white flex items-center gap-2">
+          <i class="fa-brands fa-raspberry-pi text-rose-500"></i> Raspberry Pi Data Extractor
+        </h3>
+        <p class="text-xs text-slate-400">Drop or select `.csv` or `.json` telemetry data files recorded by Raspberry Pi.</p>
+      </div>
+
+      <!-- Drag & Drop Holder Zone -->
+      <div id="drop-zone" ondragover="onDragOver(event)" ondragleave="onDragLeave(event)" ondrop="onFileDrop(event)" onclick="document.getElementById('file-input').click()" class="border-2 border-dashed border-slate-700 hover:border-purple-500 bg-slate-950/50 hover:bg-purple-950/10 rounded-xl p-8 text-center cursor-pointer transition">
+        <i class="fa-solid fa-file-arrow-down text-3xl text-purple-400 mb-2"></i>
+        <p class="text-sm font-semibold text-slate-200">Drop Raspberry Pi .csv or .json file here</p>
+        <p class="text-xs text-slate-500 mt-1">Extracts live voltage, current, power readings & anomaly alerts</p>
+        <input type="file" id="file-input" accept=".csv,.json" onchange="onFileSelected(event)" class="hidden">
+      </div>
+
+      <!-- File Preview Info -->
+      <div id="file-preview-box" class="hidden p-3 rounded-xl bg-slate-950 border border-slate-800 text-xs font-mono-code space-y-1">
+        <div class="text-emerald-400 font-bold flex items-center gap-1.5">
+          <i class="fa-solid fa-circle-check"></i> <span id="preview-file-name">rpi_telemetry.csv</span>
+        </div>
+        <div class="text-slate-400" id="preview-file-stats">Ready to extract telemetry metrics.</div>
+      </div>
+
+      <!-- Sensitivity Sliders -->
+      <div class="space-y-3 pt-2 border-t border-slate-800">
+        <div>
+          <div class="flex justify-between text-xs mb-1">
+            <span class="text-slate-300">Overload Auto-Alert Trigger Limit</span>
+            <span class="text-rose-400 font-bold" id="lbl-modal-overload">80%</span>
+          </div>
+          <input type="range" id="input-modal-overload" min="50" max="98" value="80" oninput="document.getElementById('lbl-modal-overload').innerText=this.value+'%'" class="w-full h-1.5 bg-slate-800 rounded-lg appearance-none accent-rose-500 cursor-pointer">
+        </div>
+
+        <div>
+          <div class="flex justify-between text-xs mb-1">
+            <span class="text-slate-300">Sudden Drop Collapse Limit</span>
+            <span class="text-amber-400 font-bold" id="lbl-modal-drop">15%</span>
+          </div>
+          <input type="range" id="input-modal-drop" min="5" max="50" value="15" oninput="document.getElementById('lbl-modal-drop').innerText=this.value+'%'" class="w-full h-1.5 bg-slate-800 rounded-lg appearance-none accent-amber-500 cursor-pointer">
+        </div>
+      </div>
+
+      <div class="flex items-center justify-end space-x-3 pt-2">
+        <button onclick="closeMlModal()" class="px-4 py-2 rounded-xl text-xs font-semibold text-slate-400 hover:text-white transition">Cancel</button>
+        <button onclick="applyDeployedMlConfig()" class="px-5 py-2 rounded-xl text-xs font-bold bg-purple-600 hover:bg-purple-500 text-white shadow-lg shadow-purple-900/30 transition">
+          Extract Data & Apply
+        </button>
+      </div>
+
     </div>
+  </div>
 
-    <!-- Notification Toast Container -->
-    <div id="toastContainer" class="fixed bottom-5 right-5 z-50 flex flex-col gap-2 pointer-events-none"></div>
+  <!-- Add Node Modal -->
+  <div id="add-node-modal" class="fixed inset-0 z-50 hidden bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-4">
+    <div class="bg-slate-900 border border-slate-800 rounded-2xl max-w-md w-full p-6 space-y-4 shadow-2xl relative">
+      <button onclick="closeAddNodeModal()" class="absolute top-4 right-4 text-slate-400 hover:text-white text-lg">
+        <i class="fa-solid fa-xmark"></i>
+      </button>
 
-    <script>
-        // Substations & Generators Data
-        let generators = [
-            { id: 'unit-101', name: 'Main Substation Alpha', type: 'Substation', capacity: 500, noise: 4, active: true, output: 500 },
-            { id: 'unit-102', name: 'Generator Unit 1', type: 'Generator', capacity: 350, noise: 8, active: true, output: 350 },
-            { id: 'unit-103', name: 'Generator Unit 2', type: 'Generator', capacity: 200, noise: 6, active: false, output: 0 }
-        ];
+      <h3 class="text-lg font-bold text-white flex items-center gap-2">
+        <i class="fa-solid fa-plus-circle text-blue-400"></i> Add New Grid Power Unit
+      </h3>
 
-        let globalFluctuationMultiplier = 1.0;
-        let unitToDeleteId = null;
-        let chartInstance = null;
-        let voltageChartInstance = null;
-        const maxChartDataPoints = 20;
+      <div class="space-y-3 text-xs">
+        <div>
+          <label class="block text-slate-300 font-semibold mb-1">Unit Type</label>
+          <select id="new-node-type" class="w-full bg-slate-950 border border-slate-700 text-white rounded-lg p-2.5 focus:outline-none focus:border-blue-500">
+            <option value="substation">Substation (Main Distribution)</option>
+            <option value="generator">Auxiliary Generator (Backup Source)</option>
+          </select>
+        </div>
 
-        // Dynamic Config Settings
-        let targetVoltage = 240.0;
-        let simulationIntervalMs = 3000;
-        let simulationTimerId = null;
+        <div>
+          <label class="block text-slate-300 font-semibold mb-1">Unit Name / Identifier</label>
+          <input type="text" id="new-node-name" placeholder="e.g. Substation Delta-4" class="w-full bg-slate-950 border border-slate-700 text-white rounded-lg p-2.5 focus:outline-none focus:border-blue-500">
+        </div>
 
-        // Web Audio Feedback
-        function playBeep(freq = 440, type = 'sine', duration = 0.08) {
-            try {
-                const AudioCtx = window.AudioContext || window.webkitAudioContext;
-                if (!AudioCtx) return;
-                const ctx = new AudioCtx();
-                const osc = ctx.createOscillator();
-                const gain = ctx.createGain();
-                osc.type = type;
-                osc.frequency.setValueAtTime(freq, ctx.currentTime);
-                gain.gain.setValueAtTime(0.05, ctx.currentTime);
-                gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + duration);
-                osc.connect(gain);
-                gain.connect(ctx.destination);
-                osc.start();
-                osc.stop(ctx.currentTime + duration);
-            } catch (e) {}
-        }
+        <div>
+          <label class="block text-slate-300 font-semibold mb-1">Max Rated Capacity (kW)</label>
+          <input type="number" id="new-node-capacity" value="250" min="10" max="5000" class="w-full bg-slate-950 border border-slate-700 text-white rounded-lg p-2.5 focus:outline-none focus:border-blue-500">
+        </div>
+      </div>
 
-        function initCharts() {
-            // Main Power Fluctuation Chart
-            const ctx1 = document.getElementById('fluctuationChart').getContext('2d');
-            const gradientOutput = ctx1.createLinearGradient(0, 0, 0, 260);
-            gradientOutput.addColorStop(0, 'rgba(6, 182, 212, 0.4)');
-            gradientOutput.addColorStop(1, 'rgba(6, 182, 212, 0.0)');
+      <div class="flex items-center justify-end space-x-3 pt-3">
+        <button onclick="closeAddNodeModal()" class="px-4 py-2 rounded-xl text-xs font-semibold text-slate-400 hover:text-white transition">Cancel</button>
+        <button onclick="submitNewNode()" class="px-5 py-2 rounded-xl text-xs font-bold bg-blue-600 hover:bg-blue-500 text-white transition">
+          Create & Activate Node
+        </button>
+      </div>
 
-            // Pre-fill initial labels with formatted times
-            const initialLabels = [];
-            const now = new Date();
-            for (let i = maxChartDataPoints - 1; i >= 0; i--) {
-                const t = new Date(now.getTime() - i * 3000);
-                initialLabels.push(t.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' }));
+    </div>
+  </div>
+
+  <script>
+    // System Data & Grid State
+    let lineVoltage = 240.0;
+    let telemetryIntervalMs = 3000;
+    let telemetryTimer = null;
+
+    // ML Thresholds
+    let mlOverloadThresholdPct = 80.0;
+    let mlDropThresholdPct = 15.0;
+    let activeAlertLanguage = 'en';
+    let extractedRpiData = null;
+
+    // Current State Metrics
+    let previousTotalPowerKW = 0.0;
+    let activeAlertState = null; // null, 'overload', 'drop'
+
+    // Multi-Language Alert Notification Dictionary
+    const MULTI_LANG_ALERTS = {
+      normal: {
+        en: "Grid status is nominal. Power distribution and load levels are well within safety boundaries.",
+        hi: "ग्रिड की स्थिति सामान्य है। बिजली वितरण और लोड स्तर पूरी तरह से सुरक्षित सीमा के भीतर हैं।",
+        te: "గ్రిడ్ స్థితి సాధారణంగా ఉంది. విద్యుత్ పంపిణీ మరియు లోడ్ స్థాయిలు సురక్షిత పరిమితిలో ఉన్నాయి.",
+        ta: "கிரிட் நிலை இயல்பாக உள்ளது. மின் விநியோகம் மற்றும் சுமை அளவுகள் பாதுகாப்பான வரம்பிற்குள் உள்ளன.",
+        kn: "ಗ್ರಿಡ್ ಸ್ಥಿತಿ ಸಾಮಾನ್ಯವಾಗಿದೆ. ವಿದ್ಯುತ್ ವಿತರಣೆ ಮತ್ತು ಲೋಡ್ ಮಟ್ಟಗಳು ಸುರಕ್ಷಿತ ಮಿತಿಯಲ್ಲಿವೆ.",
+        ml: "ഗ്രിഡ് നില സാധാരണമാണ്. വൈദ്യുത വിതരണവും ലോഡ് നിലകളും സുരക്ഷിത പരിധിക്കുള്ളിലാണ്.",
+        mr: "ग्रिडची स्थिती सामान्य आहे. वीज वितरण आणि लोड पातळी पूर्णपणे सुरक्षित मर्याड्यात आहे.",
+        bn: "গ্রিডের অবস্থা স্বাভাবিক। বিদ্যুৎ বণ্টন এবং লোডের মাত্রা সম্পূর্ণ নিরাপদ সীমার মধ্যে রয়েছে।",
+        gu: "ગ્રીડની સ્થિતિ સામાન્ય છે. વીજ વિતરણ અને લોડ સ્તર પૂરતા સુરક્ષિત સીમામાં છે.",
+        pa: "ਗ੍ਰਿਡ ਦੀ ਸਥਿਤੀ ਆਮ ਹੈ। ਬਿਜਲੀ ਦੀ ਵੰਡ ਅਤੇ ਲੋਡ ਦਾ ਪੱਧਰ ਪੂਰੀ ਤਰ੍ਹਾਂ ਸੁਰੱਖਿਅਤ ਸੀਮਾ ਦੇ ਅੰਦਰ ਹੈ।",
+        or: "ଗ୍ରିଡ୍ ସ୍ଥିତି ସାଧାରଣ ଅଛି। ବିଦ୍ୟୁତ୍ ବଣ୍ଟନ ଏବଂ ଲୋଡ୍ ସ୍ତର ସମ୍ପୂର୍ଣ୍ଣ ସୁରକ୍ଷିତ ସୀମା ମଧ୍ୟରେ ଅଛି।"
+      },
+      overload: {
+        en: "ALERT: System overload ho raha hai, aap please ek baar dekh lijiyega! High power demand exceeds safe limit.",
+        hi: "अलर्ट: सिस्टम ओवरलोड हो रहा है, आप प्लीज एक बार देख लीजियेगा! पावर डिमांड सुरक्षित सीमा से अधिक है।",
+        te: "హెచ్చరిక: సిస్టమ్ ఓవర్‌లోడ్ అవుతోంది, దయచేసి ఒకసారి చూడండి! విద్యుత్ డిమాండ్ సురక్షిత పరిమితిని మించిపోయింది.",
+        ta: "எச்சரிக்கை: சிஸ்டம் ஓவர்லோட் ஆகிறது, தயவுசெய்து ஒரு முறை சரிபார்க்கவும்! மின் தேவை பாதுகாப்பான எல்லையை దాண்டிவிட்டது.",
+        kn: "ಎಚ್ಚರಿಕೆ: ಸಿಸ್ಟಮ್ ಓವರ್‌ಲೋಡ್ ಆಗುತ್ತಿದೆ, ದಯವಿಟ್ಟು ಒಮ್ಮೆ ಪರಿಶೀಲಿಸಿ! ವಿದ್ಯುತ್ ಬೇಡಿಕೆ ಸುರಕ್ಷಿತ ಮಿತಿಯನ್ನು ಮೀರಿದೆ.",
+        ml: "മുന്നറിയിപ്പ്: സിസ്റ്റം ഓവർലോഡ് ആകുന്നു, ദയവായി ഒന്ന് പരിശോധിക്കുക! വൈദ്യുത ആവശ്യകത സുരക്ഷിത പരിധി കടന്നു.",
+        mr: "अलर्ट: सिस्टम ओव्हरलोड होत आहे, आपण कृपया एकदा तपासून घ्या! वीज मागणी सुरक्षित मर्यादा ओलांडत आहे.",
+        bn: "সতর্কতা: সিস্টেম ওভারলোড হচ্ছে, আপনি অনুগ্রহ করে একবার দেখে নিন! পাওয়ার চাহিদা নিরাপদ সীমা অতিক্রম করেছে।",
+        gu: "અલર્ટ: સિસ્ટમ ઓવરલોડ થઈ રહ્યું છે, આપ કૃપા કરીને એકવાર જોઈ લેજો! પાવર ડિમાન્ડ સુરક્ષિત સીમાથી વધુ છે.",
+        pa: "ਅਲਰਟ: ਸਿਸਟਮ ਓਵਰਲੋਡ ਹੋ ਰਿਹਾ ਹੈ, ਤੁਸੀਂ ਕਿਰਪਾ ਕਰਕੇ ਇੱਕ ਵਾਰ ਦੇਖ ਲਵੋ! ਬਿਜਲੀ ਦੀ ਮੰਗ ਸੁਰੱਖਿਅਤ ਸੀਮਾ ਤੋਂ ਵੱਧ ਹੈ।",
+        or: "ଅଲର୍ଟ: ସିଷ୍ଟମ୍ ଓଭରଲୋଡ୍ ହେଉଛି, ଆପଣ ଦୟାକରି ଥରେ ଦେଖିନିଅନ୍ତୁ! ପାୱାର୍ ଚାହିଦା ସୁରକ୍ଷିତ ସୀମା ଅତିକ୍ରମ କରିଛି।"
+      },
+      drop: {
+        en: "WARNING: Regular load achanak se kam ho gaya hai! Sudden collapse detected in active power demand.",
+        hi: "चेतावनी: रेगुलर लोड अचानक से कम हो गया है! बिजली की मांग में अचानक भारी गिरावट दर्ज की गई है।",
+        te: "హెచ్చరిక: సాధారణ లోడ్ అకస్మాత్తుగా తగ్గిపోయింది! లోడ్‌లో హఠాత్తుగా భారీ క్షీణత నమోదైంది.",
+        ta: "எச்சரிக்கை: வழக்கமான சுமை திடீரென குறைந்துவிட்டது! மின் தேவையில் திடீர் சரிவு கண்டறியப்பட்டது.",
+        kn: "ಎಚ್ಚರಿಕೆ: ನಿಯಮಿತ ಲೋಡ್ ಹಠಾತ್ತನೆ ಕಡಿಮೆಯಾಗಿದೆ! ವಿದ್ಯುತ್ ಬೇಡಿಕೆಯಲ್ಲಿ ಹಠಾತ್ ಕುಸಿತ ಕಂಡುಬಂದಿದೆ.",
+        ml: "മുന്നറിയിപ്പ്: പതിവ് ലോഡ് പെട്ടെന്ന് കുറഞ്ഞു! വൈദ്യുത ആവശ്യകതയിൽ പെട്ടെന്നുള്ള ഇടിവ് രേഖപ്പെടുത്തി.",
+        mr: "इशारा: नियमित लोड अचानक कमी झाला आहे! वीज मागणीत अचानक मोठी घसरण झाली आहे.",
+        bn: "সতর্কতা: নিয়মিত লোড হঠাৎ কমে গেছে! পাওয়ার চাহিদায় হঠাৎ অস্বাভাবিক পতন শনাক্ত হয়েছে।",
+        gu: "ચેતવણી: રેગ્યુલર લોડ અચાનક ઓછો થઈ ગયો છે! પાવર ડિમાન્ડમાં અચાનક ભારે ઘટાડો નોંધાયો છે.",
+        pa: "ਚੇਤਾਵਨੀ: ਰੈਗੂਲਰ ਲੋਡ ਅਚਾਨਕ ਘਟ ਗਿਆ ਹੈ! ਬਿਜਲੀ ਦੀ ਮੰਗ ਵਿੱਚ ਅਚਾਨਕ ਭਾਰੀ ਗਿਰਾਵਟ ਆਈ ਹੈ।",
+        or: "ଚେତାବନୀ: ନିୟମିତ ଲୋଡ୍ ହଠାତ୍ କମିଯାଇଛି! ପାୱାର୍ ଚାହିଦାରେ ହଠାତ୍ ଅସ୍ୱାଭାବିକ ହ୍ରାସ ରେକର୍ଡ ହୋଇଛି।"
+      }
+    };
+
+    // Substation & Generator Nodes Data Structure
+    let gridNodes = [
+      { id: 'sub-1', name: 'Substation North-Alpha', type: 'substation', capacityKW: 300, currentLoadKW: 180, active: true },
+      { id: 'sub-2', name: 'Substation South-Beta', type: 'substation', capacityKW: 400, currentLoadKW: 240, active: true },
+      { id: 'gen-1', name: 'Aux Gen Main Hub', type: 'generator', capacityKW: 200, currentLoadKW: 90, active: true },
+      { id: 'gen-2', name: 'Backup Gen Reserve', type: 'generator', capacityKW: 150, currentLoadKW: 0, active: false }
+    ];
+
+    // Chart.js Instances
+    let chartAInstance = null;
+    let chartBInstance = null;
+
+    const maxChartDataPoints = 25;
+    const chartLabels = Array(maxChartDataPoints).fill('');
+    const voltageData = Array(maxChartDataPoints).fill(lineVoltage);
+    const currentData = Array(maxChartDataPoints).fill(0);
+    const powerData = Array(maxChartDataPoints).fill(0);
+    const anomalyData = Array(maxChartDataPoints).fill(0.02);
+
+    window.onload = function() {
+      initCharts();
+      renderNodes();
+      updateTotalsAndEvaluate();
+      
+      // Start initial loop
+      telemetryTimer = setInterval(telemetryTick, telemetryIntervalMs);
+      logEvent('SYSTEM', 'Telemetry stream started with 3.0s interval. Fixed Voltage: 240V.');
+    };
+
+    function initCharts() {
+      // Graph A: Voltage & Current
+      const ctxA = document.getElementById('chartVoltageCurrent').getContext('2d');
+      chartAInstance = new Chart(ctxA, {
+        type: 'line',
+        data: {
+          labels: chartLabels,
+          datasets: [
+            {
+              label: 'Voltage (V)',
+              data: voltageData,
+              borderColor: '#f59e0b',
+              borderWidth: 1.5,
+              borderDash: [4, 4],
+              yAxisID: 'yV',
+              pointRadius: 0
+            },
+            {
+              label: 'Current (A)',
+              data: currentData,
+              borderColor: '#10b981',
+              backgroundColor: 'rgba(16, 185, 129, 0.1)',
+              borderWidth: 2,
+              fill: true,
+              yAxisID: 'yA',
+              tension: 0.35,
+              pointRadius: 0
             }
-
-            chartInstance = new Chart(ctx1, {
-                type: 'line',
-                data: {
-                    labels: initialLabels,
-                    datasets: [
-                        {
-                            label: 'Actual Output (kW)',
-                            data: Array(maxChartDataPoints).fill(850),
-                            borderColor: '#06b6d4',
-                            borderWidth: 2,
-                            backgroundColor: gradientOutput,
-                            fill: true,
-                            tension: 0.3,
-                            pointRadius: 2,
-                            pointHoverRadius: 5
-                        },
-                        {
-                            label: 'Rated Capacity (kW)',
-                            data: Array(maxChartDataPoints).fill(850),
-                            borderColor: '#4b5563',
-                            borderWidth: 1.5,
-                            borderDash: [4, 4],
-                            fill: false,
-                            tension: 0.1,
-                            pointRadius: 0
-                        }
-                    ]
-                },
-                options: {
-                    responsive: true,
-                    maintainAspectRatio: false,
-                    animation: { duration: 300 },
-                    plugins: {
-                        legend: { display: false },
-                        tooltip: { mode: 'index', intersect: false }
-                    },
-                    scales: {
-                        x: { 
-                            grid: { color: 'rgba(255, 255, 255, 0.05)' },
-                            ticks: { color: '#9ca3af', font: { size: 10 }, maxRotation: 0 }
-                        },
-                        y: {
-                            grid: { color: 'rgba(255, 255, 255, 0.05)' },
-                            ticks: { color: '#9ca3af', font: { size: 10 } }
-                        }
-                    }
-                }
-            });
-
-            // Voltage & Current Chart
-            const ctx2 = document.getElementById('voltageChart').getContext('2d');
-            voltageChartInstance = new Chart(ctx2, {
-                type: 'line',
-                data: {
-                    labels: [...initialLabels],
-                    datasets: [{
-                        label: 'Voltage (V)',
-                        data: Array(maxChartDataPoints).fill(240),
-                        borderColor: '#f59e0b',
-                        borderWidth: 1.8,
-                        tension: 0.4,
-                        pointRadius: 2
-                    }]
-                },
-                options: {
-                    responsive: true,
-                    maintainAspectRatio: false,
-                    animation: { duration: 300 },
-                    plugins: { legend: { display: false } },
-                    scales: {
-                        x: { display: false },
-                        y: {
-                            min: 220,
-                            max: 260,
-                            grid: { color: 'rgba(255, 255, 255, 0.05)' },
-                            ticks: { color: '#9ca3af', font: { size: 10 } }
-                        }
-                    }
-                }
-            });
-        }
-
-        function renderGenerators() {
-            const grid = document.getElementById('generatorsGrid');
-            const emptyState = document.getElementById('emptyGeneratorsState');
-            
-            const activeCount = generators.filter(g => g.active).length;
-            document.getElementById('generatorBadgeCount').textContent = `${activeCount} / ${generators.length} Active`;
-
-            if (generators.length === 0) {
-                grid.innerHTML = '';
-                emptyState.classList.remove('hidden');
-                return;
-            } else {
-                emptyState.classList.add('hidden');
+          ]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          animation: false,
+          scales: {
+            x: { display: false },
+            yV: {
+              type: 'linear',
+              position: 'left',
+              grid: { color: 'rgba(255,255,255,0.05)' },
+              ticks: { color: '#f59e0b', font: { family: 'JetBrains Mono', size: 10 } },
+              min: 0,
+              max: 400
+            },
+            yA: {
+              type: 'linear',
+              position: 'right',
+              grid: { drawOnChartArea: false },
+              ticks: { color: '#10b981', font: { family: 'JetBrains Mono', size: 10 } },
+              min: 0
             }
-
-            grid.innerHTML = generators.map(gen => {
-                const percent = gen.capacity > 0 ? Math.round((gen.output / gen.capacity) * 100) : 0;
-                const isSubstation = gen.type === 'Substation';
-                const typeIcon = isSubstation ? 'fa-tower-observation text-cyan-400' : 'fa-bolt text-amber-400';
-                const cardBorder = gen.active ? 'border-gray-800 hover:border-cyan-500/40' : 'border-gray-800/60 opacity-80';
-
-                return `
-                <div id="card-${gen.id}" class="glow-card generator-card rounded-xl p-4 flex flex-col justify-between ${cardBorder} relative">
-                    <div>
-                        <!-- Header -->
-                        <div class="flex items-center justify-between gap-2 mb-3">
-                            <div class="flex items-center gap-2.5">
-                                <div class="p-2 rounded-lg bg-gray-800/80 text-base">
-                                    <i class="fa-solid ${typeIcon}"></i>
-                                </div>
-                                <div>
-                                    <h3 class="text-sm font-bold text-white leading-tight">${gen.name}</h3>
-                                    <span class="text-xs text-gray-400">${gen.type}</span>
-                                </div>
-                            </div>
-                            
-                            <!-- Status Pill -->
-                            <span class="px-2.5 py-1 rounded-full text-[10px] font-bold tracking-wider ${gen.active ? 'bg-emerald-950 text-emerald-400 border border-emerald-800' : 'bg-gray-800 text-gray-400 border border-gray-700'}">
-                                ${gen.active ? '● RUNNING' : '○ STOPPED'}
-                            </span>
-                        </div>
-
-                        <!-- Live Metrics Box -->
-                        <div class="grid grid-cols-2 gap-2 my-3 p-2 bg-gray-950/60 rounded-lg border border-gray-800/60 text-xs">
-                            <div>
-                                <span class="text-gray-400 block text-[10px]">CURRENT OUTPUT</span>
-                                <span class="font-mono font-bold text-white text-sm" id="out-${gen.id}">${Math.round(gen.output)} kW</span>
-                            </div>
-                            <div>
-                                <span class="text-gray-400 block text-[10px]">MAX CAPACITY</span>
-                                <span class="font-mono font-bold text-gray-300 text-sm">${gen.capacity} kW</span>
-                            </div>
-                        </div>
-
-                        <!-- Fluctuation Bar -->
-                        <div class="space-y-1 mb-4">
-                            <div class="flex justify-between text-[11px] text-gray-400">
-                                <span>Output Load Ratio</span>
-                                <span class="font-semibold ${gen.active ? 'text-cyan-400' : 'text-gray-500'}">${percent}%</span>
-                            </div>
-                            <div class="w-full bg-gray-950 rounded-full h-2 overflow-hidden border border-gray-800">
-                                <div class="h-full rounded-full transition-all duration-300 ${gen.active ? 'bg-gradient-to-r from-cyan-500 to-emerald-400' : 'bg-gray-700'}" style="width: ${percent}%"></div>
-                            </div>
-                        </div>
-                    </div>
-
-                    <!-- Individual Start, Stop, and Remove Controls -->
-                    <div class="border-t border-gray-800/80 pt-3 mt-1 flex items-center justify-between gap-2">
-                        <div class="flex items-center gap-2">
-                            <!-- START Button -->
-                            <button onclick="startUnit('${gen.id}')" ${gen.active ? 'disabled' : ''}
-                                    class="px-3 py-1.5 rounded-lg font-semibold text-xs transition flex items-center gap-1.5 ${gen.active ? 'bg-gray-800 text-gray-600 cursor-not-allowed border border-gray-800' : 'bg-emerald-600 hover:bg-emerald-500 text-white shadow-md shadow-emerald-600/20'}">
-                                <i class="fa-solid fa-play text-[10px]"></i>
-                                <span>Start</span>
-                            </button>
-
-                            <!-- STOP Button -->
-                            <button onclick="stopUnit('${gen.id}')" ${!gen.active ? 'disabled' : ''}
-                                    class="px-3 py-1.5 rounded-lg font-semibold text-xs transition flex items-center gap-1.5 ${!gen.active ? 'bg-gray-800 text-gray-600 cursor-not-allowed border border-gray-800' : 'bg-amber-600 hover:bg-amber-500 text-white shadow-md shadow-amber-600/20'}">
-                                <i class="fa-solid fa-stop text-[10px]"></i>
-                                <span>Stop</span>
-                            </button>
-                        </div>
-
-                        <!-- REMOVE Button -->
-                        <button onclick="promptRemoveUnit('${gen.id}')" title="Remove Equipment"
-                                class="p-1.5 px-2.5 rounded-lg bg-red-950/40 text-red-400 border border-red-900/40 hover:bg-red-900 hover:text-white transition text-xs flex items-center gap-1">
-                            <i class="fa-solid fa-trash-can"></i>
-                        </button>
-                    </div>
-                </div>
-                `;
-            }).join('');
+          },
+          plugins: {
+            legend: { labels: { color: '#e5e7eb', font: { size: 11 } } }
+          }
         }
+      });
 
-        // Individual Start Unit
-        function startUnit(id) {
-            const gen = generators.find(g => g.id === id);
-            if (gen && !gen.active) {
-                gen.active = true;
-                gen.output = gen.capacity;
-                playBeep(600, 'sine', 0.1);
-                addLogEntry(`Unit "${gen.name}" (${gen.type}) STARTED.`, 'text-emerald-400');
-                showToast(`"${gen.name}" turned ON`, 'success');
-                renderGenerators();
-                updateTotals();
+      // Graph B: Power & Anomaly
+      const ctxB = document.getElementById('chartPowerAnomaly').getContext('2d');
+      chartBInstance = new Chart(ctxB, {
+        type: 'line',
+        data: {
+          labels: chartLabels,
+          datasets: [
+            {
+              label: 'Total Power (kW)',
+              data: powerData,
+              borderColor: '#c084fc',
+              backgroundColor: 'rgba(192, 132, 252, 0.1)',
+              borderWidth: 2,
+              fill: true,
+              yAxisID: 'yPower',
+              tension: 0.35,
+              pointRadius: 0
+            },
+            {
+              label: 'Anomaly Confidence',
+              data: anomalyData,
+              borderColor: '#ef4444',
+              borderWidth: 1.5,
+              yAxisID: 'yAnomaly',
+              tension: 0.2,
+              pointRadius: 0
             }
-        }
-
-        // Individual Stop Unit
-        function stopUnit(id) {
-            const gen = generators.find(g => g.id === id);
-            if (gen && gen.active) {
-                gen.active = false;
-                gen.output = 0;
-                playBeep(300, 'sine', 0.1);
-                addLogEntry(`Unit "${gen.name}" (${gen.type}) STOPPED.`, 'text-amber-400');
-                showToast(`"${gen.name}" turned OFF`, 'danger');
-                renderGenerators();
-                updateTotals();
+          ]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          animation: false,
+          scales: {
+            x: { display: false },
+            yPower: {
+              type: 'linear',
+              position: 'left',
+              grid: { color: 'rgba(255,255,255,0.05)' },
+              ticks: { color: '#c084fc', font: { family: 'JetBrains Mono', size: 10 } },
+              min: 0
+            },
+            yAnomaly: {
+              type: 'linear',
+              position: 'right',
+              grid: { drawOnChartArea: false },
+              ticks: { color: '#ef4444', font: { family: 'JetBrains Mono', size: 10 } },
+              min: 0,
+              max: 1.0
             }
+          },
+          plugins: {
+            legend: { labels: { color: '#e5e7eb', font: { size: 11 } } }
+          }
         }
+      });
+    }
 
-        // Prompt Remove Unit
-        function promptRemoveUnit(id) {
-            const gen = generators.find(g => g.id === id);
-            if (!gen) return;
-            unitToDeleteId = id;
-            document.getElementById('deleteConfirmText').textContent = `Are you sure you want to remove "${gen.name}" (${gen.capacity} kW)?`;
-            
-            const modal = document.getElementById('deleteConfirmModal');
-            modal.classList.remove('hidden');
-            setTimeout(() => {
-                modal.classList.remove('opacity-0');
-            }, 10);
+    function telemetryTick() {
+      // Occasional automated grid anomaly events (surges / drops) for live auto-detection
+      const anomalyRoll = Math.random();
+
+      gridNodes.forEach(node => {
+        if (node.active) {
+          let deltaPct = (Math.random() - 0.48) * 0.06; // ±3% normal flutter
+
+          // Automated random surge event (triggers Overload auto-detection)
+          if (anomalyRoll < 0.12 && node.type === 'substation') {
+            deltaPct += 0.35; // Surge load
+          }
+          // Automated random drop event (triggers Sudden Drop auto-detection)
+          else if (anomalyRoll > 0.88 && node.type === 'substation') {
+            deltaPct -= 0.35; // Drop load
+          }
+
+          let newLoad = node.currentLoadKW * (1 + deltaPct);
+          newLoad = Math.max(10, Math.min(node.capacityKW * 0.98, newLoad));
+          node.currentLoadKW = newLoad;
         }
+      });
 
-        // Confirm Remove Unit
-        function confirmRemoveUnit() {
-            if (!unitToDeleteId) return;
-            const index = generators.findIndex(g => g.id === unitToDeleteId);
-            if (index !== -1) {
-                const name = generators[index].name;
-                generators.splice(index, 1);
-                playBeep(220, 'sawtooth', 0.15);
-                addLogEntry(`Unit "${name}" REMOVED from the system.`, 'text-red-400');
-                showToast(`"${name}" removed successfully`, 'danger');
-                renderGenerators();
-                updateTotals();
+      renderNodes();
+      updateTotalsAndEvaluate();
+    }
+
+    function updateTotalsAndEvaluate() {
+      let totalKW = 0;
+      let totalCapacityKW = 0;
+
+      gridNodes.forEach(node => {
+        if (node.active) {
+          totalKW += node.currentLoadKW;
+        }
+        totalCapacityKW += node.capacityKW;
+      });
+
+      // Current A = Power (W) / Voltage (V)
+      const totalWatts = totalKW * 1000;
+      const totalAmperes = lineVoltage > 0 ? (totalWatts / lineVoltage) : 0;
+      const capacityRatioPct = totalCapacityKW > 0 ? (totalKW / totalCapacityKW) * 100 : 0;
+
+      // Update UI Metrics
+      document.getElementById('metric-current').innerText = `${totalAmperes.toFixed(1)} A`;
+      document.getElementById('metric-power').innerText = `${totalKW.toFixed(2)} kW`;
+      document.getElementById('lbl-fixed-voltage').innerText = `${lineVoltage.toFixed(1)}V`;
+      document.getElementById('lbl-rms-current').innerText = `±${(totalAmperes * 0.02).toFixed(2)}A`;
+      document.getElementById('lbl-peak-power').innerText = `${(totalKW * 1.15).toFixed(2)} kW`;
+
+      // AUTOMATIC OVERLOAD & DROP DETECTION LOGIC
+      let detectedAnomaly = false;
+      let anomalyScore = 0.02;
+
+      // Check if any individual active node or total grid exceeds overload cap
+      let overloadedNode = gridNodes.find(n => n.active && (n.currentLoadKW / n.capacityKW * 100) >= mlOverloadThresholdPct);
+
+      // 1. Check Automatic Overload Condition
+      if (capacityRatioPct >= mlOverloadThresholdPct || overloadedNode) {
+        detectedAnomaly = true;
+        anomalyScore = 0.94;
+        const targetName = overloadedNode ? overloadedNode.name : 'Grid Total';
+        const targetPct = overloadedNode ? (overloadedNode.currentLoadKW / overloadedNode.capacityKW * 100).toFixed(1) : capacityRatioPct.toFixed(1);
+        triggerAlert('overload', `Automatic Alert: Critical overload detected on ${targetName} at ${targetPct}% capacity.`);
+      } 
+      // 2. Check Automatic Sudden Load Drop Condition
+      else if (previousTotalPowerKW > 50 && (previousTotalPowerKW - totalKW) / previousTotalPowerKW >= (mlDropThresholdPct / 100)) {
+        const dropPct = ((previousTotalPowerKW - totalKW) / previousTotalPowerKW * 100).toFixed(1);
+        detectedAnomaly = true;
+        anomalyScore = 0.88;
+        triggerAlert('drop', `Automatic Alert: Sudden load collapse detected! Power dropped by ${dropPct}% in 1 tick.`);
+      } 
+      // 3. Normal Operating Condition
+      else {
+        if (activeAlertState !== null) {
+          resetAlertToNormal();
+        }
+      }
+
+      previousTotalPowerKW = totalKW;
+
+      // Update Anomaly score display
+      document.getElementById('lbl-anomaly-score').innerText = `${anomalyScore.toFixed(2)} (${detectedAnomaly ? 'ANOMALY DETECTED' : 'Nominal'})`;
+
+      // Push to Charts
+      if (chartAInstance && chartBInstance) {
+        voltageData.shift();
+        voltageData.push(lineVoltage);
+
+        currentData.shift();
+        currentData.push(totalAmperes);
+
+        powerData.shift();
+        powerData.push(totalKW);
+
+        anomalyData.shift();
+        anomalyData.push(anomalyScore);
+
+        chartAInstance.update('none');
+        chartBInstance.update('none');
+      }
+    }
+
+    function triggerAlert(type, logDetails) {
+      activeAlertState = type;
+      const center = document.getElementById('alert-notification-center');
+      const iconWrap = document.getElementById('alert-icon-wrapper');
+      const icon = document.getElementById('alert-icon');
+      const titleBadge = document.getElementById('alert-title-badge');
+      const timestamp = document.getElementById('alert-timestamp');
+
+      timestamp.innerText = new Date().toLocaleTimeString();
+
+      if (type === 'overload') {
+        center.className = "w-full rounded-2xl border border-rose-500/80 bg-rose-950/40 p-4 transition-all duration-300 glow-alert-red animate-pulse";
+        iconWrap.className = "w-10 h-10 rounded-xl bg-rose-500/20 border border-rose-500/60 flex items-center justify-center text-rose-400 shrink-0";
+        icon.className = "fa-solid fa-triangle-exclamation text-xl";
+        titleBadge.className = "px-2.5 py-0.5 rounded-md text-xs font-bold bg-rose-500/30 text-rose-300 border border-rose-500/50 uppercase tracking-wide";
+        titleBadge.innerText = "CRITICAL OVERLOAD DETECTED";
+        logEvent('ALERT_OVERLOAD', logDetails);
+      } else if (type === 'drop') {
+        center.className = "w-full rounded-2xl border border-amber-500/80 bg-amber-950/40 p-4 transition-all duration-300 glow-alert-amber";
+        iconWrap.className = "w-10 h-10 rounded-xl bg-amber-500/20 border border-amber-500/60 flex items-center justify-center text-amber-400 shrink-0";
+        icon.className = "fa-solid fa-arrow-trend-down text-xl";
+        titleBadge.className = "px-2.5 py-0.5 rounded-md text-xs font-bold bg-amber-500/30 text-amber-300 border border-amber-500/50 uppercase tracking-wide";
+        titleBadge.innerText = "SUDDEN LOAD DROP WARNING";
+        logEvent('ALERT_DROP', logDetails);
+      }
+
+      updateAlertMessageText();
+    }
+
+    function resetAlertToNormal() {
+      activeAlertState = null;
+      const center = document.getElementById('alert-notification-center');
+      const iconWrap = document.getElementById('alert-icon-wrapper');
+      const icon = document.getElementById('alert-icon');
+      const titleBadge = document.getElementById('alert-title-badge');
+      const timestamp = document.getElementById('alert-timestamp');
+
+      center.className = "w-full rounded-2xl border border-emerald-500/30 bg-emerald-950/20 p-4 transition-all duration-300 glow-green";
+      iconWrap.className = "w-10 h-10 rounded-xl bg-emerald-500/20 border border-emerald-500/40 flex items-center justify-center text-emerald-400 shrink-0";
+      icon.className = "fa-solid fa-shield-halved text-lg";
+      titleBadge.className = "px-2.5 py-0.5 rounded-md text-xs font-bold bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 uppercase tracking-wide";
+      titleBadge.innerText = "SYSTEM STABLE & NORMAL";
+      timestamp.innerText = "Live Monitoring Active";
+
+      updateAlertMessageText();
+    }
+
+    function setAlertLanguage(lang) {
+      activeAlertLanguage = lang;
+      
+      // Update language button highlights
+      ['en','hi','te','ta','kn','ml','mr','bn','gu','pa','or'].forEach(l => {
+        const btn = document.getElementById(`lang-btn-${l}`);
+        if (l === lang) {
+          btn.className = "px-2 py-1 rounded-md text-[11px] font-bold bg-emerald-500 text-slate-950 transition";
+        } else {
+          btn.className = "px-2 py-1 rounded-md text-[11px] font-bold text-slate-400 hover:text-white transition";
+        }
+      });
+
+      updateAlertMessageText();
+    }
+
+    function updateAlertMessageText() {
+      const msgEl = document.getElementById('alert-message-text');
+      const stateKey = activeAlertState || 'normal';
+      msgEl.innerText = MULTI_LANG_ALERTS[stateKey][activeAlertLanguage] || MULTI_LANG_ALERTS[stateKey]['en'];
+    }
+
+    function renderNodes() {
+      const container = document.getElementById('nodes-container');
+      container.innerHTML = '';
+
+      gridNodes.forEach(node => {
+        const loadPct = ((node.currentLoadKW / node.capacityKW) * 100).toFixed(1);
+        const isOverloaded = loadPct >= mlOverloadThresholdPct;
+
+        const card = document.createElement('div');
+        card.className = `p-5 rounded-2xl border transition-all duration-300 ${
+          !node.active 
+            ? 'bg-slate-900/40 border-slate-800/80 opacity-60' 
+            : isOverloaded 
+              ? 'bg-rose-950/20 border-rose-500/60 glow-alert-red' 
+              : 'bg-slate-900/80 border-slate-800 hover:border-slate-700'
+        }`;
+
+        card.innerHTML = `
+          <div class="flex items-center justify-between mb-3">
+            <div class="flex items-center space-x-2.5">
+              <div class="w-8 h-8 rounded-lg ${node.type === 'substation' ? 'bg-blue-500/10 text-blue-400 border border-blue-500/30' : 'bg-amber-500/10 text-amber-400 border border-amber-500/30'} flex items-center justify-center text-sm">
+                <i class="fa-solid ${node.type === 'substation' ? 'fa-building-shield' : 'fa-charging-station'}"></i>
+              </div>
+              <div>
+                <h4 class="text-sm font-bold text-white">${node.name}</h4>
+                <span class="text-[10px] uppercase font-mono-code ${node.active ? 'text-emerald-400' : 'text-slate-500'}">
+                  ${node.active ? '● OPERATIONAL' : '○ OFFLINE (STOPPED)'}
+                </span>
+              </div>
+            </div>
+            <button onclick="removeNode('${node.id}')" title="Remove Unit" class="text-slate-500 hover:text-rose-400 transition text-xs p-1">
+              <i class="fa-solid fa-trash-can"></i>
+            </button>
+          </div>
+
+          <div class="space-y-2 text-xs font-mono-code mb-4">
+            <div class="flex justify-between text-slate-400">
+              <span>Active Load:</span>
+              <strong class="${isOverloaded ? 'text-rose-400' : 'text-slate-200'}">${node.currentLoadKW.toFixed(1)} kW / ${node.capacityKW} kW</strong>
+            </div>
+            <div class="w-full bg-slate-950 h-2 rounded-full overflow-hidden border border-slate-800">
+              <div class="h-full transition-all duration-300 ${isOverloaded ? 'bg-rose-500' : node.type === 'substation' ? 'bg-blue-500' : 'bg-amber-500'}" style="width: ${Math.min(100, loadPct)}%;"></div>
+            </div>
+            <div class="flex justify-between text-[11px] text-slate-500 pt-1">
+              <span>Utilization:</span>
+              <span>${loadPct}%</span>
+            </div>
+          </div>
+
+          <!-- START & STOP CONTROLS DIRECTLY UNDER CARD -->
+          <div class="grid grid-cols-2 gap-2 pt-2 border-t border-slate-800/80">
+            <button onclick="toggleNodeState('${node.id}', true)" ${node.active ? 'disabled' : ''} class="py-1.5 px-3 rounded-xl text-xs font-semibold flex items-center justify-center gap-1.5 transition ${
+              node.active 
+                ? 'bg-slate-800/40 text-slate-600 cursor-not-allowed border border-slate-800' 
+                : 'bg-emerald-600 hover:bg-emerald-500 text-white shadow-lg shadow-emerald-900/30 border border-emerald-500/40'
+            }">
+              <i class="fa-solid fa-play text-[10px]"></i> START
+            </button>
+
+            <button onclick="toggleNodeState('${node.id}', false)" ${!node.active ? 'disabled' : ''} class="py-1.5 px-3 rounded-xl text-xs font-semibold flex items-center justify-center gap-1.5 transition ${
+              !node.active 
+                ? 'bg-slate-800/40 text-slate-600 cursor-not-allowed border border-slate-800' 
+                : 'bg-rose-600/20 hover:bg-rose-600/30 text-rose-300 border border-rose-500/40'
+            }">
+              <i class="fa-solid fa-stop text-[10px]"></i> STOP
+            </button>
+          </div>
+        `;
+
+        container.appendChild(card);
+      });
+    }
+
+    function toggleNodeState(nodeId, start) {
+      const node = gridNodes.find(n => n.id === nodeId);
+      if (node) {
+        node.active = start;
+        if (!start) {
+          node.currentLoadKW = 0;
+        } else {
+          node.currentLoadKW = node.capacityKW * 0.55;
+        }
+        logEvent('CONTROL', `Unit '${node.name}' was ${start ? 'STARTED' : 'STOPPED'}.`);
+        renderNodes();
+        updateTotalsAndEvaluate();
+      }
+    }
+
+    function removeNode(nodeId) {
+      const node = gridNodes.find(n => n.id === nodeId);
+      if (node) {
+        gridNodes = gridNodes.filter(n => n.id !== nodeId);
+        logEvent('CONTROL', `Unit '${node.name}' removed from telemetry grid.`);
+        renderNodes();
+        updateTotalsAndEvaluate();
+      }
+    }
+
+    function onVoltageChange(val) {
+      const newV = parseFloat(val);
+      if (!isNaN(newV) && newV > 0) {
+        lineVoltage = newV;
+        logEvent('SETTING', `Fixed Line Voltage updated to ${lineVoltage.toFixed(1)}V.`);
+        updateTotalsAndEvaluate();
+      }
+    }
+
+    function onTimelineChange(valMs) {
+      telemetryIntervalMs = parseInt(valMs);
+      if (telemetryTimer) clearInterval(telemetryTimer);
+      telemetryTimer = setInterval(telemetryTick, telemetryIntervalMs);
+      logEvent('SETTING', `Telemetry interval rate changed to ${telemetryIntervalMs / 1000}s.`);
+    }
+
+    function triggerSimulatedOverload() {
+      gridNodes.forEach(node => {
+        if (node.active) {
+          node.currentLoadKW = node.capacityKW * 0.95; // Force 95% load
+        }
+      });
+      logEvent('SIMULATION', 'Presentation trigger: Simulated grid surge overload.');
+      renderNodes();
+      updateTotalsAndEvaluate();
+    }
+
+    function triggerSimulatedDrop() {
+      // Record drop baseline
+      const oldKW = previousTotalPowerKW;
+      gridNodes.forEach(node => {
+        if (node.type === 'substation') {
+          node.currentLoadKW = node.currentLoadKW * 0.2; // 80% sudden collapse
+        }
+      });
+      logEvent('SIMULATION', 'Presentation trigger: Simulated sudden substation breaker drop.');
+      renderNodes();
+      updateTotalsAndEvaluate();
+    }
+
+    function openMlModal() {
+      document.getElementById('ml-modal').classList.remove('hidden');
+    }
+
+    function closeMlModal() {
+      document.getElementById('ml-modal').classList.add('hidden');
+    }
+
+    function onDragOver(e) {
+      e.preventDefault();
+      document.getElementById('drop-zone').classList.add('border-purple-500', 'bg-purple-950/20');
+    }
+
+    function onDragLeave(e) {
+      e.preventDefault();
+      document.getElementById('drop-zone').classList.remove('border-purple-500', 'bg-purple-950/20');
+    }
+
+    function onFileDrop(e) {
+      e.preventDefault();
+      onDragLeave(e);
+      if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+        processUploadedFile(e.dataTransfer.files[0]);
+      }
+    }
+
+    function onFileSelected(e) {
+      if (e.target.files && e.target.files.length > 0) {
+        processUploadedFile(e.target.files[0]);
+      }
+    }
+
+    function processUploadedFile(file) {
+      const reader = new FileReader();
+      reader.onload = function(evt) {
+        const content = evt.target.result;
+        const box = document.getElementById('file-preview-box');
+        document.getElementById('preview-file-name').innerText = file.name;
+
+        if (file.name.endsWith('.json')) {
+          try {
+            const parsed = JSON.parse(content);
+            extractedRpiData = { type: 'json', data: parsed };
+            const nodeCount = parsed.nodes ? parsed.nodes.length : (parsed.gridNodes ? parsed.gridNodes.length : 0);
+            document.getElementById('preview-file-stats').innerText = `Extracted RPi JSON: ${nodeCount} nodes, Voltage=${parsed.lineVoltage || 240}V.`;
+          } catch(err) {
+            extractedRpiData = null;
+            document.getElementById('preview-file-stats').innerText = `Raw JSON loaded (${file.size} bytes).`;
+          }
+        } else {
+          // CSV extraction
+          const lines = content.trim().split('\n');
+          extractedRpiData = { type: 'csv', lines: lines, name: file.name };
+          document.getElementById('preview-file-stats').innerText = `Extracted ${lines.length - 1} telemetry log rows from RPi CSV file.`;
+        }
+        box.classList.remove('hidden');
+      };
+      reader.readAsText(file);
+    }
+
+    function applyDeployedMlConfig() {
+      const newOverload = parseFloat(document.getElementById('input-modal-overload').value);
+      const newDrop = parseFloat(document.getElementById('input-modal-drop').value);
+
+      mlOverloadThresholdPct = newOverload;
+      mlDropThresholdPct = newDrop;
+
+      const fileName = document.getElementById('preview-file-name').innerText || 'rpi_telemetry.csv';
+      document.getElementById('info-model-file').innerText = fileName;
+      document.getElementById('info-overload-cap').innerText = `${mlOverloadThresholdPct}% Capacity`;
+      document.getElementById('info-drop-thresh').innerText = `${mlDropThresholdPct}% Collapse`;
+
+      // Extract and apply data if RPi file was dropped
+      if (extractedRpiData) {
+        if (extractedRpiData.type === 'json') {
+          const d = extractedRpiData.data;
+          if (d.lineVoltage) {
+            lineVoltage = parseFloat(d.lineVoltage);
+            document.getElementById('setting-voltage').value = lineVoltage;
+          }
+          if (d.nodes && Array.isArray(d.nodes)) {
+            gridNodes = d.nodes;
+          } else if (d.gridNodes && Array.isArray(d.gridNodes)) {
+            gridNodes = d.gridNodes;
+          }
+          logEvent('EXTRACT', `Extracted RPi JSON file '${fileName}'. Nodes and telemetry parameters updated.`);
+        } else if (extractedRpiData.type === 'csv' && extractedRpiData.lines) {
+          const lines = extractedRpiData.lines;
+          // Parse CSV lines and feed directly into chart data buffers
+          let validRows = 0;
+          for (let i = 1; i < lines.length; i++) {
+            const cols = lines[i].split(',');
+            if (cols.length >= 2) {
+              const parsedV = parseFloat(cols[0]);
+              const parsedkW = parseFloat(cols[1]);
+              if (!isNaN(parsedV) && !isNaN(parsedkW)) {
+                voltageData.shift();
+                voltageData.push(parsedV);
+                powerData.shift();
+                powerData.push(parsedkW);
+                validRows++;
+              }
             }
-            closeDeleteModal();
+          }
+          logEvent('EXTRACT', `Extracted ${validRows} telemetry samples from RPi CSV '${fileName}'. Stream updated.`);
         }
+      } else {
+        logEvent('DEPLOY', `Applied threshold configuration. Overload: ${mlOverloadThresholdPct}%, Drop: ${mlDropThresholdPct}%.`);
+      }
 
-        function closeDeleteModal() {
-            const modal = document.getElementById('deleteConfirmModal');
-            modal.classList.add('opacity-0');
-            setTimeout(() => {
-                modal.classList.add('hidden');
-                unitToDeleteId = null;
-            }, 200);
-        }
+      closeMlModal();
+      renderNodes();
+      updateTotalsAndEvaluate();
+    }
 
-        function openAddModal() {
-            const modal = document.getElementById('addGeneratorModal');
-            modal.classList.remove('hidden');
-            setTimeout(() => {
-                modal.classList.remove('opacity-0');
-                modal.querySelector('#modalContent').classList.remove('scale-95');
-            }, 10);
-        }
+    function logEvent(category, message) {
+      const container = document.getElementById('log-container');
+      const timeStr = new Date().toLocaleTimeString();
 
-        function closeAddModal() {
-            const modal = document.getElementById('addGeneratorModal');
-            modal.classList.add('opacity-0');
-            modal.querySelector('#modalContent').classList.add('scale-95');
-            setTimeout(() => {
-                modal.classList.add('hidden');
-            }, 200);
-        }
+      const item = document.createElement('div');
+      item.className = "flex items-start justify-between py-1 border-b border-slate-800/60";
+      
+      let badgeColor = "text-blue-400";
+      if (category.includes('ALERT')) badgeColor = "text-rose-400 font-bold";
+      if (category === 'DEPLOY') badgeColor = "text-purple-400";
+      if (category === 'CONTROL') badgeColor = "text-emerald-400";
 
-        function applyPreset(name, type, capacity, noise) {
-            document.getElementById('genName').value = name;
-            document.getElementById('genType').value = type;
-            document.getElementById('genCapacity').value = capacity;
-            document.getElementById('genCapacityVal').textContent = `${capacity} kW`;
-            document.getElementById('genNoise').value = noise;
-            document.getElementById('genNoiseVal').textContent = `${noise}%`;
-        }
+      item.innerHTML = `
+        <span class="text-slate-500 shrink-0 w-20">[${timeStr}]</span>
+        <span class="${badgeColor} font-semibold shrink-0 w-28">${category}:</span>
+        <span class="text-slate-300 flex-1 pl-2 truncate" title="${message}">${message}</span>
+      `;
 
-        // Add Unit Form Submit
-        document.getElementById('addGeneratorForm').addEventListener('submit', function(e) {
-            e.preventDefault();
-            const name = document.getElementById('genName').value.trim();
-            const type = document.getElementById('genType').value;
-            const capacity = parseFloat(document.getElementById('genCapacity').value);
-            const noise = parseFloat(document.getElementById('genNoise').value);
+      container.prepend(item);
+    }
 
-            const newUnit = {
-                id: 'unit-' + Date.now(),
-                name: name || `${type} ${generators.length + 1}`,
-                type: type,
-                capacity: capacity,
-                noise: noise,
-                active: true,
-                output: capacity
-            };
-
-            generators.push(newUnit);
-            playBeep(880, 'sine', 0.1);
-            addLogEntry(`NEW ${type} "${newUnit.name}" added (${newUnit.capacity} kW)`, 'text-cyan-400');
-            showToast(`Added "${newUnit.name}"`, 'success');
-
-            renderGenerators();
-            updateTotals();
-            closeAddModal();
-
-            this.reset();
-            document.getElementById('genCapacityVal').textContent = '300 kW';
-            document.getElementById('genNoiseVal').textContent = '6%';
-        });
-
-        function updateTotals() {
-            const activeGens = generators.filter(g => g.active);
-            const totalCapacity = generators.reduce((acc, g) => acc + (g.active ? g.capacity : 0), 0);
-            
-            document.getElementById('totalCapacityVal').textContent = totalCapacity.toLocaleString();
-            document.getElementById('activeGeneratorsCount').textContent = activeGens.length;
-
-            let realOutput = 0;
-            activeGens.forEach(g => {
-                realOutput += g.output;
-            });
-
-            document.getElementById('realtimePowerVal').textContent = Math.round(realOutput).toLocaleString();
-
-            const loadPct = totalCapacity > 0 ? Math.min(100, Math.round((realOutput / totalCapacity) * 100)) : 0;
-            document.getElementById('capacityBar').style.width = `${loadPct}%`;
-
-            const badge = document.getElementById('systemStatusBadge');
-            if (globalFluctuationMultiplier > 2.5) {
-                badge.textContent = 'CRITICAL SURGE';
-                badge.className = 'text-lg font-bold text-red-500';
-            } else if (globalFluctuationMultiplier > 1.8) {
-                badge.textContent = 'HIGH JITTER';
-                badge.className = 'text-lg font-bold text-amber-400';
-            } else {
-                badge.textContent = 'NORMAL';
-                badge.className = 'text-lg font-bold text-emerald-400';
-            }
-        }
-
-        // Live Telemetry Tick
-        function runSimulationTick() {
-            let totalActualOutput = 0;
-            let totalTargetCapacity = 0;
-
-            generators.forEach(gen => {
-                if (gen.active) {
-                    const noiseAmount = (gen.noise / 100) * globalFluctuationMultiplier;
-                    const randomJitter = (Math.random() - 0.5) * 2 * noiseAmount;
-                    const calculatedOutput = Math.max(0, gen.capacity * (1 + randomJitter));
-                    
-                    gen.output = calculatedOutput;
-                    totalActualOutput += calculatedOutput;
-                    totalTargetCapacity += gen.capacity;
-
-                    const cardOut = document.getElementById(`out-${gen.id}`);
-                    if (cardOut) {
-                        cardOut.textContent = `${Math.round(calculatedOutput)} kW`;
-                    }
-                } else {
-                    gen.output = 0;
-                }
-            });
-
-            document.getElementById('realtimePowerVal').textContent = Math.round(totalActualOutput).toLocaleString();
-            document.getElementById('totalCapacityVal').textContent = totalTargetCapacity.toLocaleString();
-
-            // Voltage & Current Calculations using dynamic targetVoltage
-            const currentVoltage = targetVoltage.toFixed(1);
-            const baseCurrent = totalActualOutput > 0 ? (totalActualOutput / targetVoltage).toFixed(1) : '0.0';
-            document.getElementById('liveVoltageVal').textContent = currentVoltage;
-            document.getElementById('liveCurrentVal').textContent = baseCurrent;
-            document.getElementById('jitterPct').textContent = `±${(1.2 * globalFluctuationMultiplier).toFixed(1)}%`;
-
-            const timeStr = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
-
-            // Push to Power Fluctuation Chart
-            if (chartInstance) {
-                chartInstance.data.labels.push(timeStr);
-                chartInstance.data.labels.shift();
-
-                chartInstance.data.datasets[0].data.push(totalActualOutput);
-                chartInstance.data.datasets[0].data.shift();
-                
-                chartInstance.data.datasets[1].data.push(totalTargetCapacity);
-                chartInstance.data.datasets[1].data.shift();
-                
-                chartInstance.update();
-            }
-
-            // Push to Voltage Chart
-            if (voltageChartInstance) {
-                voltageChartInstance.data.labels.push(timeStr);
-                voltageChartInstance.data.labels.shift();
-
-                voltageChartInstance.data.datasets[0].data.push(parseFloat(currentVoltage));
-                voltageChartInstance.data.datasets[0].data.shift();
-                voltageChartInstance.update();
-            }
-        }
-
-        // Timer Loop Manager
-        function startSimulationLoop() {
-            if (simulationTimerId) clearInterval(simulationTimerId);
-            simulationTimerId = setInterval(runSimulationTick, simulationIntervalMs);
-        }
-
-        // Helper Logging & Toasts
-        function addLogEntry(message, colorClass = 'text-gray-300') {
-            const consoleBox = document.getElementById('logConsole');
-            const time = new Date().toLocaleTimeString();
-            const line = document.createElement('div');
-            line.className = `flex items-start gap-2 ${colorClass}`;
-            line.innerHTML = `<span class="text-gray-500">[${time}]</span> <span>${message}</span>`;
-            consoleBox.appendChild(line);
-            consoleBox.scrollTop = consoleBox.scrollHeight;
-        }
-
-        function showToast(message, type = 'info') {
-            const container = document.getElementById('toastContainer');
-            const toast = document.createElement('div');
-            toast.className = `pointer-events-auto px-4 py-2.5 rounded-xl shadow-xl text-xs font-semibold flex items-center gap-2 transition transform translate-y-2 border ${
-                type === 'success' ? 'bg-emerald-950 text-emerald-300 border-emerald-700' :
-                type === 'danger' ? 'bg-red-950 text-red-300 border-red-800' :
-                'bg-gray-900 text-cyan-300 border-gray-700'
-            }`;
-            toast.innerHTML = `<i class="fa-solid ${type === 'success' ? 'fa-circle-check' : type === 'danger' ? 'fa-triangle-exclamation' : 'fa-circle-info'}"></i> ${message}`;
-            
-            container.appendChild(toast);
-            setTimeout(() => {
-                toast.classList.add('opacity-0', '-translate-y-2');
-                setTimeout(() => toast.remove(), 300);
-            }, 3000);
-        }
-
-        // DOM Event Listeners
-        document.addEventListener('DOMContentLoaded', () => {
-            initCharts();
-            renderGenerators();
-            updateTotals();
-
-            document.getElementById('genCapacity').addEventListener('input', (e) => {
-                document.getElementById('genCapacityVal').textContent = `${e.target.value} kW`;
-            });
-            document.getElementById('genNoise').addEventListener('input', (e) => {
-                document.getElementById('genNoiseVal').textContent = `${e.target.value}%`;
-            });
-
-            document.getElementById('openAddModalBtn').addEventListener('click', openAddModal);
-            document.getElementById('openAddModalBtn2').addEventListener('click', openAddModal);
-            document.getElementById('emptyAddBtn').addEventListener('click', openAddModal);
-            document.getElementById('closeModalBtn').addEventListener('click', closeAddModal);
-            document.getElementById('cancelModalBtn').addEventListener('click', closeAddModal);
-
-            document.getElementById('confirmDeleteBtn').addEventListener('click', confirmRemoveUnit);
-            document.getElementById('cancelDeleteBtn').addEventListener('click', closeDeleteModal);
-
-            document.getElementById('fluctuationPreset').addEventListener('change', (e) => {
-                const val = e.target.value;
-                switch(val) {
-                    case 'low': globalFluctuationMultiplier = 0.4; break;
-                    case 'medium': globalFluctuationMultiplier = 1.0; break;
-                    case 'high': globalFluctuationMultiplier = 2.0; break;
-                    case 'extreme': globalFluctuationMultiplier = 3.2; break;
-                }
-                addLogEntry(`Fluctuation Jitter level set to "${val.toUpperCase()}"`, 'text-amber-400');
-            });
-
-            // Timeline Interval Listener
-            document.getElementById('timelineIntervalSelect').addEventListener('change', (e) => {
-                simulationIntervalMs = parseInt(e.target.value, 10);
-                startSimulationLoop();
-                const sec = (simulationIntervalMs / 1000).toFixed(1);
-                document.getElementById('loadStressVal').textContent = `${sec}s interval`;
-                addLogEntry(`Timeline update interval changed to ${sec} seconds`, 'text-cyan-400');
-                showToast(`Interval set to ${sec}s`, 'info');
-            });
-
-            // Voltage Setting Listener
-            document.getElementById('voltageInput').addEventListener('change', (e) => {
-                const val = parseFloat(e.target.value);
-                if (!isNaN(val) && val > 0) {
-                    targetVoltage = val;
-                    if (voltageChartInstance) {
-                        voltageChartInstance.options.scales.y.min = Math.max(0, targetVoltage - 40);
-                        voltageChartInstance.options.scales.y.max = targetVoltage + 40;
-                        voltageChartInstance.update();
-                    }
-                    addLogEntry(`Grid baseline voltage set to ${targetVoltage} V`, 'text-amber-400');
-                    showToast(`Voltage updated to ${targetVoltage} V`, 'info');
-                }
-            });
-
-            document.getElementById('clearLogsBtn').addEventListener('click', () => {
-                document.getElementById('logConsole').innerHTML = '';
-            });
-
-            // Start simulation interval loop
-            startSimulationLoop();
-            addLogEntry('Telemetry monitoring started.', 'text-cyan-400');
-        });
-    </script>
+    function clearEventLogs() {
+      document.getElementById('log-container').innerHTML = '';
+    }
+  </script>
 </body>
 </html>
